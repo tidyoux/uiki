@@ -32,34 +32,6 @@
 ; + Syntax highlighting support via code-prettify
 ; + Backup/versioning support via git
 
-; KNOWN BUGS:
-
-; + No warning on racing edits.
-
-; TODO:
-
-; + Include suffices in links, e.g., [[cat]]s renders as `cats`
-; + Add web interface for version control
-; + Add support for local install of MathJax
-; + Add support for local install of code-prettify
-; + Add support for git over ssh access to page repos
-; + Add support for git over http access to page repos (git-http-backend)
-; + Add support for site-wide LaTeX macro files inclusion
-; + Add support for HTTP authentication
-; + Allow uplodaing images
-; + Allow uploading other file types (pdf)
-; + Add support for citation management with .bib files
-
-; SECURITY ISSUES:
-
-; + Strip out problematic (all?) HTML tags: script, style, etc.
-; + Verify absence of injection for shell/system/process uses.
-
-; CONSIDER:
-
-; + Could git submodules allow database to be giant module?
-;   Would this allow checking out entire wiki db locally?
-
 
 (require web-server/servlet
          web-server/servlet-env)
@@ -68,127 +40,22 @@
 
 (require xml)
 
-(require parser-tools/lex)
-(require (prefix-in : parser-tools/lex-sre))
-
 (require net/uri-codec)
 
-(require file/sha1)
-(require net/base64)
 
+(require
+  "base/command.rkt"
+  "base/xexpr.rkt"
+  "base/wikify.rkt"
+  "base/auth.rkt"
+  )
 
 ; Import configuration variables:
-(include "config.rkt")
-
-
-; Shell interaction:
-(define ($ command)
-  ; run a shell command, then
-  ; print out stdout, stderr as needed:
-  (match (process command)
-    [`(,stdout ,stdin ,exit ,stderr ,proc)
-     (define cmd-out (port->string stdout))
-     (define cmd-err (port->string stderr))
-     
-     (printf "$ command~n~a~n" cmd-out)
-     
-     (when (not (equal? cmd-err ""))
-       (printf "~nerror:~n~a~n" cmd-err))]))
-
-
-; Wiki text mark-up routines:
-(define wikify-text
-  ; convert a port into a list of strings,
-  ; converting wiki mark-ups in the process:
-  (lexer
-   [(:: "[[" (complement (:: any-string "]]" any-string)) "]]")
-    (begin
-      (define text (substring lexeme 2 (- (string-length lexeme) 2)))
-      (define target:text (string-split text "|"))
-      (define link 
-        (match target:text
-          [`(,target)         (wikify-link target)]
-          [`(,target ,text)   (wikify-link target text)]))
-      (cons link (wikify-text input-port)))]
-      
-   [any-char
-    (cons lexeme (wikify-text input-port))]
-   
-   [(eof)
-    '()]))
-
-(define (wikify-target target)
-  ; sanitize a link target:
-  (string-replace (string-downcase target) #px"[\\W]" "-"))
-
-(define (wikify-link target [text #f])
-  ; create an anchor tag:
-  (define safe-target (wikify-target target))
-  (string-append 
-   "<a href=\"/wiki/" safe-target "\">" 
-   (if text text target)
-   "</a>"))
-
-
-; Page-generation helpers:
-(define (generate-head-xexpr
-         #:title [title "no title"]
-         #:style [style ""])
-  ; generate a page header:
-  `(head 
-    (title ,title)
-    (style 
-     ,(string-append default-style "\n" style))))
+(include "base/config.rkt")
 
 
 ; Basic HTTP request processing helpers:
 (define ext=>mime-type (read-mime-types mime-types-file))
-
-
-; HTTP Basic Authentication:
-(define (htpasswd-credentials-valid?
-         passwd-file
-         username
-         password)
-  ; checks if the given credentials match those in the database
-  ; it assumes all entries as SHA1-encoded as in `htpasswd -s`.
-
-  ; read in the lines from the password file:
-  (define lines (call-with-input-file passwd-file 
-                  (λ (port) (port->lines port))))
-  
-  ; convert the password to sha1:
-  (define sha1-pass (sha1-bytes (open-input-bytes password)))
-  
-  ; then to base64 encoding:
-  (define sha1-pass-b64 
-    (bytes->string/utf-8 (base64-encode sha1-pass #"")))
-  
-  ; check if both the username and the password match:
-  (define (password-matches? line)
-
-      (define user:hash (string-split line ":"))
-      
-      (define user (car user:hash))
-      (define hash (cadr user:hash))
-      
-      (match (string->list hash)
-        ; check for SHA1 prefix
-        [`(#\{ #\S #\H #\A #\} . ,hashpass-chars)
-         (define hashpass (list->string hashpass-chars))
-         (and (equal? username (string->bytes/utf-8 user)) 
-              (equal? hashpass sha1-pass-b64))]))
-  
-  ; check to see if any line validates:
-  (ormap password-matches? lines))
-
-(define (authenticated? passwd-file req)
-  ; checks if a request has valid credentials:
-  (match (request->basic-credentials req)
-    [(cons user pass)
-     (htpasswd-credentials-valid? passwd-file user pass)]
-    
-    [else     #f]))
 
 
 ; A handler for static files:
@@ -217,18 +84,8 @@
       (λ (client-out)
         (write-bytes (file->bytes file) client-out)))]
     
-    [else
-     ; =>
-     (response/xexpr
-      #:preamble #"<!DOCTYPE html>"
-      #:code     404
-      #:message  #"Not found"
-      `(html
-        ,(generate-head-xexpr 
-          #:title #"Not found")
-        (body
-         (p "Not found"))))]))
-          
+    [else (response/xexpr/404)]))
+               
    
 (define (handle-git-version-changes dir-path)
   ; if the git repository doesn't exist, create it:
@@ -311,7 +168,7 @@
      (response/xexpr
       #:preamble #"<!DOCTYPE html>"
       `(html
-        ,(generate-head-xexpr 
+        ,(response/xexpr/head 
           #:title (string-append "edit: " page)
           #:style "
 
@@ -358,7 +215,7 @@ textarea#content {
         (write-bytes #"<!DOCTYPE>\n<html>\n" client-out)
         
         ; render the header:
-        (define head (generate-head-xexpr 
+        (define head (response/xexpr/head 
                       #:title (string-append page " :: " uiki-name)))
         
         (write-string (xexpr->string head) client-out)
@@ -372,11 +229,11 @@ MathJax.Hub.Config({
   tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
 });
 </script>" client-out)
-        (write-bytes #"<script src=\"https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML\"></script>" client-out)
+        (write-bytes #"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
         
         ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js\"></script>" client-out)
-        
+        (write-bytes #"<script src=\"http://localhost:8080/file/run_prettify.js\"></script>" client-out)
+
         ; Include a message, if any:
         (when message
           (write-string message client-out)
@@ -413,7 +270,7 @@ MathJax.Hub.Config({
      (response/xexpr
       #:preamble #"<!DOCTYPE html>"
       `(html
-        ,(generate-head-xexpr
+        ,(response/xexpr/head
           #:title "page does not yet exist")
         (body
          (p "Page does not exist")
@@ -440,7 +297,9 @@ MathJax.Hub.Config({
     
     ; edit the page:
     [`(,page "edit")
-     (handle-wiki-edit-request req page)]))
+     (handle-wiki-edit-request req page)]
+     
+    [_ (response/xexpr/404)]))
     
 (define (start req)
   
@@ -478,15 +337,10 @@ MathJax.Hub.Config({
     
     [(equal? service "wiki")
      (handle-wiki-request req resource)]
+
+    [else (response/xexpr/404)]))
   
-    [else (response/xexpr
-           #:preamble #"<!DOCTYPE html>"
-           `(html 
-             (head 
-              (title "can't handle service: "  ,service)
-             (body
-              (p "Unhandled service type: " ,service)))))]))
- 
+;
 (serve/servlet start
                #:port uiki-port
                #:servlet-path "/wiki/main"
