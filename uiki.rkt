@@ -42,13 +42,11 @@
 
 (require net/uri-codec)
 
-
 (require
-  "base/command.rkt"
-  "base/xexpr.rkt"
-  "base/wikify.rkt"
-  "base/auth.rkt"
-  )
+    "base/command.rkt"
+    "base/xexpr.rkt"
+    "base/wikify.rkt"
+    "base/auth.rkt")
 
 ; Import configuration variables:
 (include "base/config.rkt")
@@ -59,55 +57,57 @@
 
 
 ; A handler for static files:
-(define (handle-file-request req docroot path)
-  
-  ; NOTE: In practice, static requests can be replaced by
-  ; providing an #:extra-files-paths to serve/servlet.
-  
-  ; identify the requested file:
-  (define file (string-append docroot "/" (string-join path "/")))
-  
-  (cond
-    [(file-exists? file)
-     ; =>
-     (define extension (string->symbol (bytes->string/utf-8 (filename-extension file))))
-     (define content-type 
-       (hash-ref ext=>mime-type extension 
-                 (λ () TEXT/HTML-MIME-TYPE)))
-     
-     ; send the requested file back:
-     (response
-      200 #"OK"            ; code & message
-      (current-seconds)    ; timestamp
-      content-type         ; content-type
-      '()                  ; additional headers
-      (λ (client-out)
-        (write-bytes (file->bytes file) client-out)))]
+(define (handle-file-request req path)
     
-    [else (response/xexpr/404)]))
+    ; NOTE: In practice, static requests can be replaced by
+    ; providing an #:extra-files-paths to serve/servlet.
+
+    (define docroot document-root)
+    
+    ; identify the requested file:
+    (define file (string-append docroot "/" (string-join path "/")))
+    
+    (cond
+        [(file-exists? file)
+        ; =>
+        (define extension (string->symbol (bytes->string/utf-8 (filename-extension file))))
+        (define content-type 
+        (hash-ref ext=>mime-type extension 
+                    (λ () TEXT/HTML-MIME-TYPE)))
+        
+        ; send the requested file back:
+        (response
+        200 #"OK"            ; code & message
+        (current-seconds)    ; timestamp
+        content-type         ; content-type
+        '()                  ; additional headers
+        (λ (client-out)
+            (write-bytes (file->bytes file) client-out)))]
+        
+        [else (response/xexpr/404)]))
                
    
 (define (handle-git-version-changes dir-path)
-  ; if the git repository doesn't exist, create it:
-  (when (not (directory-exists? (string-append dir-path "/.git")))
+    ; if the git repository doesn't exist, create it:
+    (when (not (directory-exists? (string-append dir-path "/.git")))
+        
+        ; TODO/WARNING/SECURITY: Injection attack vulnerability
+        ; Need to verify that wikilink-name escapes path.
+        
+        (define git-init-cmd
+            (string-append "git -C '" dir-path "' init;"
+                           "git -C '" dir-path "' add content.md;"
+                           "git -C '" dir-path "' commit -m 'Initial commit.'"))
+        
+        ($ git-init-cmd))
     
-    ; TODO/WARNING/SECURITY: Injection attack vulnerability
-    ; Need to verify that wikilink-name escapes path.
+    ; commit changes:
+    (define git-commit-cmd 
+        (string-append "git -C '" dir-path "' add content.md;"
+                    ; TODO: Let the user set the update comment.
+                    "git -C '" dir-path "' commit -m 'Updated page.'"))
     
-    (define git-init-cmd
-      (string-append "git -C '" dir-path "' init;"
-                     "git -C '" dir-path "' add content.md;"
-                     "git -C '" dir-path "' commit -m 'Initial commit.'"))
-    
-    ($ git-init-cmd))
-  
-  ; commit changes:
-  (define git-commit-cmd 
-    (string-append "git -C '" dir-path "' add content.md;"
-                   ; TODO: Let the user set the update comment.
-                   "git -C '" dir-path "' commit -m 'Updated page.'"))
-  
-  ($ git-commit-cmd))
+    ($ git-commit-cmd))
 
 
 ; Wiki-specific requests:
@@ -117,7 +117,6 @@
   
   ; directory location:
   (define dir-path (string-append database-dir "/" (wikify-target page)))
-  
   
   ; create the directory if it does not exist:
   (define created? #f)
@@ -152,7 +151,6 @@
    req page 
    #:message (if created? "Page created." "Page edited.")))
 
-
     
 ; A handler to render the interface for editing a page:
 (define (handle-wiki-edit-request req page)
@@ -180,7 +178,7 @@ textarea#content {
 ")
         (body
          (form ((method "POST")
-                (action "./"))
+                (action ,(string-append "/wiki/" page)))
                (textarea
                 ((id "content")
                  (name "content"))
@@ -279,76 +277,53 @@ MathJax.Hub.Config({
                (input ([type "submit"] [value "Create page"]))))))]))
 
 
-(define (handle-wiki-request req resource)
-  ; handle a top level /wiki/ request:
-  (when (equal? (last resource) "")
-    (set! resource (reverse (cdr (reverse resource)))))
-  
-  (match resource
-    ; view the page:
-    [`(,page)
-     #:when (equal? (request-method req) #"GET")
-     (handle-wiki-view-request req page)]
-    
-    ; modify the page contents:
-    [`(,page)
-     #:when (equal? (request-method req) #"POST")
-     (handle-wiki-content-put-request req page)]
-    
-    ; edit the page:
-    [`(,page "edit")
-     (handle-wiki-edit-request req page)]
-     
-    [_ (response/xexpr/404)]))
-    
+; list-wikis
+(define (list-wikis req)
+    (display (map path/param-path (url-path (request-uri req))))
+    (response/xexpr/404))
+
+; dispatchs
+(define dispatch
+    (dispatch-case
+        [("") list-wikis]
+
+        [("wiki" (string-arg)) #:method "get" handle-wiki-view-request]
+        [("wiki" (string-arg) "") #:method "get" handle-wiki-view-request]
+
+        [("wiki" (string-arg)) #:method "post" handle-wiki-content-put-request]
+        [("wiki" (string-arg) "") #:method "post" handle-wiki-content-put-request]
+
+        [("wiki" (string-arg) "edit") handle-wiki-edit-request]
+        [("wiki" (string-arg) "edit" "") handle-wiki-edit-request]
+
+        [("file" (string-arg)...) handle-file-request]
+        
+        [else list-wikis]))
+
+
+; start
 (define (start req)
-  
-  ; extract the uri from the request:
-  (define uri (request-uri req))
-  
-  ; extract the path from the uri:
-  (define path (map path/param-path (url-path uri)))
-    
-  ; The first element of the path determines the service;
-  ; choices are "wiki" or "file":
-  (define service (car path))
-  
-  (define resource (cdr path))
-  
-  ; NOTE: This could be simplified with a higher-level
-  ; interface for web-server/dispatch:
-  
-  ; http://docs.racket-lang.org/web-server/dispatch.html
-  
-  (cond
-    [(and auth-db-path (not (authenticated? auth-db-path req)))
-     (response
-      401 #"Unauthorized" 
-      (current-seconds) 
-      TEXT/HTML-MIME-TYPE
-      (list
-       (make-basic-auth-header
-        "Authentication required"
-        ))
-      void)]
-    
-    [(equal? service "file")
-     (handle-file-request req document-root resource)]
-    
-    [(equal? service "wiki")
-     (handle-wiki-request req resource)]
+    (if (and auth-db-path (not (authenticated? auth-db-path req)))
+        (response
+            401 #"Unauthorized" 
+            (current-seconds) 
+            TEXT/HTML-MIME-TYPE
+            (list
+                (make-basic-auth-header
+                    "Authentication required"
+                    ))
+            void)
 
-    [else (response/xexpr/404)]))
+        (dispatch req)))
   
-;
-(serve/servlet start
-               #:port uiki-port
-               #:servlet-path "/wiki/main"
-               #:servlet-regexp #rx""
-               #:launch-browser? #f
-               #:ssl? use-ssl?
-               #:ssl-cert ssl-cert-path
-               #:ssl-key ssl-private-key-path
-               #;end)
+(define (run)
+    (serve/servlet start
+                #:port uiki-port
+                #:launch-browser? #f
+                #:servlet-regexp #rx""
+                #:ssl? use-ssl?
+                #:ssl-cert ssl-cert-path
+                #:ssl-key ssl-private-key-path
+                #;end))
 
-
+(run)
