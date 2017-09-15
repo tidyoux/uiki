@@ -1,4 +1,6 @@
 
+(define debug #f)
+
 ; the name of the giki:
 (define uiki-name "generic uiki")
 
@@ -11,14 +13,10 @@
 ; the root directory:
 (define root (path->string (current-directory)))
 
-; mime types:
-(define mime-types-file (string-append root "/mime.types"))
 
 ; the database directory:
 (define database-dir (string-append root "/db"))
 
-; the root for static files:
-(define document-root (string-append root "/docroot"))
 
 ; the default stylesheet included in every page:
 (define default-style 

@@ -17,8 +17,9 @@
     (style 
      ,(string-append default-style "\n" style))))
 
+
 ; 404
-(define (response/xexpr/404)
+(define (response/xexpr/404 req)
     (response/xexpr
         #:preamble #"<!DOCTYPE html>"
         #:code     404

@@ -36,162 +36,111 @@
 (require web-server/servlet
          web-server/servlet-env)
 
-(require web-server/private/mime-types)
-
 (require xml)
 
 (require net/uri-codec)
 
 (require
-    "base/command.rkt"
+    "base/cmd.rkt"
     "base/xexpr.rkt"
     "base/wikify.rkt"
+    "base/git.rkt"
     "base/auth.rkt")
 
 ; Import configuration variables:
 (include "base/config.rkt")
 
 
-; Basic HTTP request processing helpers:
-(define ext=>mime-type (read-mime-types mime-types-file))
+; list wiki
+(define (list-wiki req)
+    (response/xexpr
+        #:preamble #"<!DOCTYPE html>"
+        `(html
+            ,(response/xexpr/head
+                #:title "wiki list")
+            (body
+                (p "this is the list")))))
 
 
-; A handler for static files:
-(define (handle-file-request req path)
+; update wiki
+(define (update-wiki req page)
+    ; modifies the contents of the specified page.
     
-    ; NOTE: In practice, static requests can be replaced by
-    ; providing an #:extra-files-paths to serve/servlet.
-
-    (define docroot document-root)
+    ; directory location:
+    (define dir-path (string-append database-dir "/" (wikify-target page)))
     
-    ; identify the requested file:
-    (define file (string-append docroot "/" (string-join path "/")))
+    ; create the directory if it does not exist:
+    (define created? #f)
+    (when (not (directory-exists? dir-path))
+        (set! created? #t)
+        (make-directory dir-path))
+    
+    ; location of the markdown file:
+    (define md-file-path (string-append dir-path "/" "content.md"))
+
+    ; grab the new contents:
+    (define post-data (request-post-data/raw req))
+    
+    (define param-string (bytes->string/utf-8 post-data))
+    
+    (define params (form-urlencoded->alist param-string))
+                    
+    (define contents (cdr (assq 'content params)))
+
+    ; edit the content file:
+    (call-with-output-file
+    md-file-path
+    #:exists 'replace 
+    (λ (out)
+        (write-string contents out)))
+    
+    ; Notify git of changes.
+    (git-commit dir-path)
+
+    ; Render the page.
+    (view-wiki 
+    req page 
+    #:message (if created? "Page created." "Page edited.")))
+
+    
+; edit wiki
+(define (edit-wiki req page)
+    ; creates a page to allow editing.
+    
+    (define dir-path (string-append database-dir "/" page))
+    (define md-file-path (string-append dir-path "/" "content.md"))
     
     (cond
-        [(file-exists? file)
+        
+        [(file-exists? md-file-path)
         ; =>
-        (define extension (string->symbol (bytes->string/utf-8 (filename-extension file))))
-        (define content-type 
-        (hash-ref ext=>mime-type extension 
-                    (λ () TEXT/HTML-MIME-TYPE)))
-        
-        ; send the requested file back:
-        (response
-        200 #"OK"            ; code & message
-        (current-seconds)    ; timestamp
-        content-type         ; content-type
-        '()                  ; additional headers
-        (λ (client-out)
-            (write-bytes (file->bytes file) client-out)))]
-        
-        [else (response/xexpr/404)]))
-               
-   
-(define (handle-git-version-changes dir-path)
-    ; if the git repository doesn't exist, create it:
-    (when (not (directory-exists? (string-append dir-path "/.git")))
-        
-        ; TODO/WARNING/SECURITY: Injection attack vulnerability
-        ; Need to verify that wikilink-name escapes path.
-        
-        (define git-init-cmd
-            (string-append "git -C '" dir-path "' init;"
-                           "git -C '" dir-path "' add content.md;"
-                           "git -C '" dir-path "' commit -m 'Initial commit.'"))
-        
-        ($ git-init-cmd))
-    
-    ; commit changes:
-    (define git-commit-cmd 
-        (string-append "git -C '" dir-path "' add content.md;"
-                    ; TODO: Let the user set the update comment.
-                    "git -C '" dir-path "' commit -m 'Updated page.'"))
-    
-    ($ git-commit-cmd))
+        (response/xexpr
+        #:preamble #"<!DOCTYPE html>"
+        `(html
+            ,(response/xexpr/head 
+            #:title (string-append "edit: " page)
+            #:style "
 
+    textarea#content {
+    width: 50em;
+    height: 30em;
+    }
 
-; Wiki-specific requests:
-
-(define (handle-wiki-content-put-request req page)
-  ; modifies the contents of the specified page.
-  
-  ; directory location:
-  (define dir-path (string-append database-dir "/" (wikify-target page)))
-  
-  ; create the directory if it does not exist:
-  (define created? #f)
-  (when (not (directory-exists? dir-path))
-    (set! created? #t)
-    (make-directory dir-path))
-  
-  ; location of the markdown file:
-  (define md-file-path (string-append dir-path "/" "content.md"))
-
-  ; grab the new contents:
-  (define post-data (request-post-data/raw req))
-  
-  (define param-string (bytes->string/utf-8 post-data))
-  
-  (define params (form-urlencoded->alist param-string))
-                  
-  (define contents (cdr (assq 'content params)))
-
-  ; edit the content file:
-  (call-with-output-file
-   md-file-path
-   #:exists 'replace 
-   (λ (out)
-     (write-string contents out)))
-  
-  ; Notify git of changes.
-  (handle-git-version-changes dir-path)
-
-  ; Render the page.
-  (handle-wiki-view-request 
-   req page 
-   #:message (if created? "Page created." "Page edited.")))
-
-    
-; A handler to render the interface for editing a page:
-(define (handle-wiki-edit-request req page)
-  ; creates a page to allow editing.
-  
-  (define dir-path (string-append database-dir "/" page))
-  (define md-file-path (string-append dir-path "/" "content.md"))
-  
-  (cond
-    
-    [(file-exists? md-file-path)
-     ; =>
-     (response/xexpr
-      #:preamble #"<!DOCTYPE html>"
-      `(html
-        ,(response/xexpr/head 
-          #:title (string-append "edit: " page)
-          #:style "
-
-textarea#content {
-  width: 50em;
-  height: 30em;
-}
-
-")
-        (body
-         (form ((method "POST")
-                (action ,(string-append "/wiki/" page)))
-               (textarea
-                ((id "content")
-                 (name "content"))
-                ,(file->string md-file-path))
-               (br)
-               (input ([type "submit"] [value "submit changes"]))))))]))
-
-
+    ")
+            (body
+            (form ((method "POST")
+                    (action ,(string-append "/wiki/" page)))
+                (textarea
+                    ((id "content")
+                    (name "content"))
+                    ,(file->string md-file-path))
+                (br)
+                (input ([type "submit"] [value "submit changes"]))))))]))
         
 
-; A handler to render pages:
-(define (handle-wiki-view-request req page
-                                  #:message [message #f])
+; view wiki
+(define (view-wiki req page
+                #:message [message #f])
   
   ; directory containing page contents:
   (define dir-path (string-append database-dir "/" page))
@@ -230,7 +179,7 @@ MathJax.Hub.Config({
         (write-bytes #"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
         
         ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"http://localhost:8080/file/run_prettify.js\"></script>" client-out)
+        (write-bytes #"<script src=\"http://localhost:8080/js/run_prettify.js\"></script>" client-out)
 
         ; Include a message, if any:
         (when message
@@ -277,28 +226,20 @@ MathJax.Hub.Config({
                (input ([type "submit"] [value "Create page"]))))))]))
 
 
-; list-wikis
-(define (list-wikis req)
-    (display (map path/param-path (url-path (request-uri req))))
-    (response/xexpr/404))
-
 ; dispatchs
 (define dispatch
     (dispatch-case
-        [("") list-wikis]
+        [("wiki") list-wiki]
+        [("wiki" "") list-wiki]
 
-        [("wiki" (string-arg)) #:method "get" handle-wiki-view-request]
-        [("wiki" (string-arg) "") #:method "get" handle-wiki-view-request]
+        [("wiki" (string-arg)) #:method "get" view-wiki]
+        [("wiki" (string-arg) "") #:method "get" view-wiki]
 
-        [("wiki" (string-arg)) #:method "post" handle-wiki-content-put-request]
-        [("wiki" (string-arg) "") #:method "post" handle-wiki-content-put-request]
+        [("wiki" (string-arg)) #:method "post" update-wiki]
+        [("wiki" (string-arg) "") #:method "post" update-wiki]
 
-        [("wiki" (string-arg) "edit") handle-wiki-edit-request]
-        [("wiki" (string-arg) "edit" "") handle-wiki-edit-request]
-
-        [("file" (string-arg)...) handle-file-request]
-        
-        [else list-wikis]))
+        [("wiki" (string-arg) "edit") edit-wiki]
+        [("wiki" (string-arg) "edit" "") edit-wiki]))
 
 
 ; start
@@ -318,12 +259,17 @@ MathJax.Hub.Config({
   
 (define (run)
     (serve/servlet start
-                #:port uiki-port
-                #:launch-browser? #f
-                #:servlet-regexp #rx""
-                #:ssl? use-ssl?
-                #:ssl-cert ssl-cert-path
-                #:ssl-key ssl-private-key-path
-                #;end))
+        #:port uiki-port
+        #:launch-browser? #f
+        #:servlet-path "/wiki/main"
+        #:servlet-regexp #rx""
+        #:server-root-path (current-directory)
+        #:extra-files-paths (list
+                                (build-path (current-directory) "static"))
+        #:file-not-found-responder response/xexpr/404
+        #:ssl? use-ssl?
+        #:ssl-cert ssl-cert-path
+        #:ssl-key ssl-private-key-path
+        #;end))
 
 (run)
