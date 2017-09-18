@@ -18,7 +18,7 @@
     (link
         ((rel "stylesheet") (href "http://localhost:8080/css/bootstrap-theme.min.css")))
     (link
-        ((rel "stylesheet") (href "http://localhost:8080/css/home.css")))
+        ((rel "stylesheet") (href "http://localhost:8080/css/main.css")))
     ))
 
 
