@@ -10,12 +10,16 @@
 
 ; head
 (define (response/xexpr/head
-         #:title [title "no title"]
-         #:style [style ""])
+         #:title [title "no title"])
   `(head 
     (title ,title)
-    (style 
-     ,(string-append default-style "\n" style))))
+    (link
+        ((rel "stylesheet") (href "http://localhost:8080/css/bootstrap.min.css")))
+    (link
+        ((rel "stylesheet") (href "http://localhost:8080/css/bootstrap-theme.min.css")))
+    (link
+        ((rel "stylesheet") (href "http://localhost:8080/css/home.css")))
+    ))
 
 
 ; 404

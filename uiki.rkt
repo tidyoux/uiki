@@ -50,16 +50,26 @@
 ; Import configuration variables:
 (include "base/config.rkt")
 
-
 ; list wiki
 (define (list-wiki req)
+    (define dir (string->path database-dir))
+    (define items
+        (foldl (lambda (path result)
+                (when (directory-exists? dir)
+                    (let ((pathstr (path->string path)))
+                         (append result `((a ((href ,(string-append "/wiki/" pathstr))) ,pathstr) (br))))))
+            '()
+            (directory-list dir)))
+
     (response/xexpr
         #:preamble #"<!DOCTYPE html>"
         `(html
             ,(response/xexpr/head
                 #:title "wiki list")
             (body
-                (p "this is the list")))))
+                (h1 "wiki:")
+                (hr)
+                (p ,@items)))))
 
 
 ; update wiki
@@ -110,32 +120,22 @@
     (define dir-path (string-append database-dir "/" page))
     (define md-file-path (string-append dir-path "/" "content.md"))
     
-    (cond
-        
-        [(file-exists? md-file-path)
-        ; =>
+    (when (file-exists? md-file-path)
         (response/xexpr
-        #:preamble #"<!DOCTYPE html>"
-        `(html
-            ,(response/xexpr/head 
-            #:title (string-append "edit: " page)
-            #:style "
-
-    textarea#content {
-    width: 50em;
-    height: 30em;
-    }
-
-    ")
-            (body
-            (form ((method "POST")
-                    (action ,(string-append "/wiki/" page)))
-                (textarea
-                    ((id "content")
-                    (name "content"))
-                    ,(file->string md-file-path))
-                (br)
-                (input ([type "submit"] [value "submit changes"]))))))]))
+            #:preamble #"<!DOCTYPE html>"
+            `(html
+                ,(response/xexpr/head
+                    #:title (string-append "edit: " page))
+                (body
+                    (form ((method "POST")
+                            (action ,(string-append "/wiki/" page)))
+                        (textarea
+                            ((id "content")
+                            (name "content"))
+                            ,(file->string md-file-path))
+                        (br)
+                        (input ([type "submit"] [value "submit changes"]))
+                        (a ([href ,(string-append "/wiki/" page)] [style "margin:2em;"]) "cancel")))))))
         
 
 ; view wiki

@@ -18,18 +18,6 @@
 (define database-dir (string-append root "/db"))
 
 
-; the default stylesheet included in every page:
-(define default-style 
-"
-body {
-  font-family: Palatino, Georgia ;
-}
-
-pre {
-  font-family: \"CMU Typewriter Text\",  Courier,  \"Courier New\" ;
-}
-")
-
 ; the command for processing markdown into html:
 (define markdown-command "multimarkdown")
 
