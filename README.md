@@ -28,7 +28,6 @@ This program serves as the motivation for my article on
  + racket
  + git
  + multimarkdown
- + sed
  + htpasswd (bundled with Apache)
  + openssl (if generating a key and cert)
 

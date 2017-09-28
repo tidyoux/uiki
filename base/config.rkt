@@ -5,7 +5,7 @@
 (define uiki-name "generic uiki")
 
 ; TCP port number:
-(define uiki-port 8080) ; set this to 8080 for testing
+(define uiki-port 1234) ; set this to 1234 for testing
                         ; set this to 80 if unencrypted
                         ; set this to 443 if using SSL
 
@@ -21,8 +21,6 @@
 ; the command for processing markdown into html:
 (define markdown-command "multimarkdown")
 
-; the command for preprocessing markdown into markdown:
-(define markdown-preprocess-command "sed -E -e 's/^```([a-z]+)/```prettyprint lang-\\1/'")
 
 ; the authentication database:
 (define auth-db-path (string-append root "/passwd"))

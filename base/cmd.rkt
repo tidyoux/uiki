@@ -12,9 +12,15 @@
         [`(,stdout ,stdin ,exit ,stderr ,proc)
         (define cmd-out (port->string stdout))
         (define cmd-err (port->string stderr))
-        
-        (when debug
-            (printf "$ command~n~a~n" cmd-out))
-        
+
         (when (not (equal? cmd-err ""))
-            (printf "~nerror:~n~a~n" cmd-err))]))
+            (printf "~nerror:~n~a~n" cmd-err))
+
+        (when debug
+            (printf "$ command: ~a~n~a~n" command cmd-out))
+
+        (close-input-port stdout)
+        (close-output-port stdin)
+        (close-input-port stderr)
+
+        cmd-out]))

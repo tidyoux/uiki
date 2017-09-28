@@ -22,7 +22,6 @@
 ; + racket 6.1.1+ (earlier versions might work)
 ; + git
 ; + multimarkdown
-; + sed
 ; + htpasswd (bundled with apache)
 
 ; FEATURES:
@@ -33,12 +32,14 @@
 ; + Backup/versioning support via git
 
 
-(require web-server/servlet
-         web-server/servlet-env)
-
-(require xml)
-
-(require net/uri-codec)
+(require
+    web-server/servlet
+    web-server/servlet-env
+    xml
+    net/uri-codec
+    (only-in 2htdp/batch-io
+        read-file
+        write-file))
 
 (require
     "base/cmd.rkt"
@@ -179,7 +180,7 @@ MathJax.Hub.Config({
         (write-bytes #"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
         
         ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"http://localhost:8080/js/run_prettify.js\"></script>" client-out)
+        (write-bytes #"<script src=\"http://localhost:1234/js/run_prettify.js\"></script>" client-out)
 
         ; Include a message, if any:
         (when message
@@ -199,12 +200,20 @@ MathJax.Hub.Config({
         
         ; Pass content.md through through a markdown formatter, and then
         ; through the wikifier to convert wiki syntax:
-        (match (process (string-append markdown-preprocess-command " " md-file-path " | " markdown-command))
-          [(list in out exit err interrupt)
-           ; Convert contents to wiki:
-           (define wikified (apply string-append (wikify-text in)))
-           
-           (write-string wikified client-out)])
+        (let ((temp-file-path (string-append md-file-path ".temp")))
+
+            (write-file temp-file-path
+                (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
+
+            (define input-port
+                (open-input-string ($ (string-append markdown-command " " temp-file-path))))
+
+            ; Convert contents to wiki:
+            (define wikified (apply string-append (wikify-text input-port)))
+            (write-string wikified client-out)
+
+            (close-input-port input-port)
+            (delete-file temp-file-path))
         
         ; Write the footer:
         (write-bytes #"</body>" client-out)
