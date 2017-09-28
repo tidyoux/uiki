@@ -19,6 +19,10 @@
         ((rel "stylesheet") (href "http://localhost:1234/css/bootstrap-theme.min.css")))
     (link
         ((rel "stylesheet") (href "http://localhost:1234/css/main.css")))
+    (script
+        ((src "http://localhost:1234/js/jquery-3.2.1.min.js")))
+    (script
+        ((src "http://localhost:1234/js/main.js")))
     ))
 
 
