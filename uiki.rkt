@@ -56,9 +56,9 @@
     (define dir (string->path database-dir))
     (define items
         (foldl (lambda (path result)
-                (when (directory-exists? dir)
-                    (let ((pathstr (path->string path)))
-                         (append result `((a ((href ,(string-append "/wiki/" pathstr))) ,pathstr) (br))))))
+            (when (directory-exists? dir)
+                (let ((pathstr (path->string path)))
+                        (append result `((li (a ((href ,(string-append "/wiki/" pathstr))) ,pathstr)))))))
             '()
             (directory-list dir)))
 
@@ -70,7 +70,7 @@
             (body
                 (h1 "wiki:")
                 (hr)
-                (p ,@items)))))
+                (p (ol ,@items))))))
 
 
 ; update wiki
@@ -191,6 +191,7 @@ MathJax.Hub.Config({
         (define wiki-top-bar 
           (string->bytes/utf-8 (string-append "
 <p>
+[<a href=\"/wiki/\">home</a>]
 [<a href=\"/wiki/" (wikify-target page) "/edit\">edit</a>]
 </p>
 <hr />")))
