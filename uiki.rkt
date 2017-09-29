@@ -100,18 +100,17 @@
 
     ; edit the content file:
     (call-with-output-file
-    md-file-path
-    #:exists 'replace 
-    (λ (out)
-        (write-string contents out)))
+        md-file-path
+        #:exists 'replace 
+        (λ (out)
+            (write-string contents out)))
     
     ; Notify git of changes.
     (git-commit dir-path)
 
     ; Render the page.
-    (view-wiki 
-    req page 
-    #:message (if created? "Page created." "Page edited.")))
+    (view-wiki req page
+        #:message (if created? "Page created." "Page edited.")))
 
     
 ; edit wiki
@@ -207,7 +206,7 @@ MathJax.Hub.Config({
                 (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
 
             (define input-port
-                (open-input-string ($ (string-append markdown-command " " temp-file-path))))
+                (open-input-string ($ markdown-command temp-file-path)))
 
             ; Convert contents to wiki:
             (define wikified (apply string-append (wikify-text input-port)))

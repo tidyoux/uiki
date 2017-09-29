@@ -5,9 +5,10 @@
 (provide $)
 
 ; Shell interaction:
-(define ($ command)
+(define ($ . commands)
     ; run a shell command, then
     ; print out stdout, stderr as needed:
+    (define command (string-join commands))
     (match (process command)
         [`(,stdout ,stdin ,exit ,stderr ,proc)
         (define cmd-out (port->string stdout))
