@@ -14,15 +14,15 @@
   `(head 
     (title ,title)
     (link
-        ((rel "stylesheet") (href "http://localhost:1234/css/bootstrap.min.css")))
+        ((rel "stylesheet") (href "../css/bootstrap.min.css")))
     (link
-        ((rel "stylesheet") (href "http://localhost:1234/css/bootstrap-theme.min.css")))
+        ((rel "stylesheet") (href "../css/bootstrap-theme.min.css")))
     (link
-        ((rel "stylesheet") (href "http://localhost:1234/css/main.css")))
+        ((rel "stylesheet") (href "../css/main.css")))
     (script
-        ((src "http://localhost:1234/js/jquery-3.2.1.min.js")))
+        ((src "../js/jquery-3.2.1.min.js")))
     (script
-        ((src "http://localhost:1234/js/main.js")))
+        ((src "../js/main.js")))
     ))
 
 

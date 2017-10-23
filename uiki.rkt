@@ -179,7 +179,7 @@ MathJax.Hub.Config({
         (write-bytes #"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
         
         ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"http://localhost:1234/js/run_prettify.js\"></script>" client-out)
+        (write-bytes #"<script src=\"../js/run_prettify.js\"></script>" client-out)
 
         ; Include a message, if any:
         (when message
