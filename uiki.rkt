@@ -58,7 +58,12 @@
         (foldl (lambda (path result)
             (when (directory-exists? dir)
                 (let ((pathstr (path->string path)))
-                        (append result `((li (a ((href ,(string-append "/wiki/" pathstr))) ,pathstr)))))))
+                        (append result
+                            `((div ((class "mdui-card mdui-m-b-2 mdui-hoverable"))
+                                (div ((class "mdui-card-content"))
+                                    (a ((class "mdui-btn") (href ,(string-append "/wiki/" pathstr)))
+                                        (i ((class "mdui-icon material-icons mdui-m-r-1")) "description")
+                                        ,pathstr))))))))
             '()
             (directory-list dir)))
 
@@ -67,10 +72,10 @@
         `(html
             ,(response/xexpr/head
                 #:title "wiki list")
-            (body
-                (h1 "wiki:")
-                (hr)
-                (p (ol ,@items))))))
+            (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange mdui-color-grey-200"))
+                (div ((class "mdui-container mdui-typo"))
+                    (h1 "wiki:")
+                    (div ,@items))))))
 
 
 ; update wiki
@@ -124,20 +129,20 @@
         (response/xexpr
             #:preamble #"<!DOCTYPE html>"
             `(html
-                ,(response/xexpr/head
+                ,(response/xexpr/edit/head
                     #:title (string-append "edit: " page))
-                (body
-                    (form ((method "POST")
-                            (action ,(string-append "/wiki/" page)))
-                        (textarea
-                            ((id "content")
-                            (name "content"))
-                            ,(file->string md-file-path))
-                        (br)
-                        (input ([type "submit"] [value "submit changes"]))
-                        (a ([href ,(string-append "/wiki/" page)] [style "margin:2em;"]) "cancel")))))))
+                (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
+                    (div ((class "mdui-container mdui-typo"))
+                        (form ((method "POST") (action ,(string-append "/wiki/" page)))
+                            (div ((class "mdui-row mdui-m-t-1"))
+                                (div ((class "mdui-col-xs-12"))
+                                    (textarea ((class "mdui-col-xs-12") (id "content") (name "content"))
+                                        ,(file->string md-file-path))))
+                            (br)
+                            (input ((class "mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme") (type "submit") (value "submit")))
+                            (a ((class "mdui-btn mdui-ripple mdui-m-l-3") (href ,(string-append "/wiki/" page)))
+                                "cancel"))))))))
         
-
 ; view wiki
 (define (view-wiki req page
                 #:message [message #f])
@@ -168,7 +173,7 @@
         (write-string (xexpr->string head) client-out)
         
         ; render the body:
-        (write-bytes #"<body>" client-out)
+        (write-bytes #"<body class=\"mdui-theme-primary-indigo mdui-theme-accent-deep-orange\">" client-out)
         
         ; enable MathJax for LaTeX support:
         (write-bytes #"<script type=\"text/x-mathjax-config\">
@@ -176,10 +181,12 @@ MathJax.Hub.Config({
   tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
 });
 </script>" client-out)
-        (write-bytes #"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
+        (write-bytes #"<script src=\"https://cdn.bootcss.com/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
         
         ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"../js/run_prettify.js\"></script>" client-out)
+        (write-bytes #"<script src=\"../js/run_prettify.js\"></script>\n" client-out)
+
+        (write-bytes #"<div class=\"mdui-container mdui-typo\">\n" client-out)
 
         ; Include a message, if any:
         (when message
@@ -190,8 +197,12 @@ MathJax.Hub.Config({
         (define wiki-top-bar 
           (string->bytes/utf-8 (string-append "
 <p>
-[<a href=\"/wiki/\">home</a>]
-[<a href=\"/wiki/" (wikify-target page) "/edit\">edit</a>]
+<a class=\"mdui-btn mdui-btn-icon mdui-ripple\" href=\"/wiki/\">
+    <i class=\"mdui-icon material-icons\">home</i>
+</a>
+<a class=\"mdui-btn mdui-btn-icon mdui-ripple\" href=\"/wiki/" (wikify-target page) "/edit\">
+    <i class=\"mdui-icon material-icons\">edit</i>
+</a>
 </p>
 <hr />")))
         
@@ -216,6 +227,8 @@ MathJax.Hub.Config({
             (delete-file temp-file-path))
         
         ; Write the footer:
+        (write-bytes #"</div>" client-out)
+
         (write-bytes #"</body>" client-out)
         
         (write-bytes #"</html>" client-out)))]
@@ -228,11 +241,15 @@ MathJax.Hub.Config({
       `(html
         ,(response/xexpr/head
           #:title "page does not yet exist")
-        (body
-         (p "Page does not exist")
-         (form ([method "POST"] [action ,(string-append "/wiki/" page)])
-               (input ([type "hidden"] [name "content"] [value "Blank page"]))
-               (input ([type "submit"] [value "Create page"]))))))]))
+        (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
+            (div ((class "mdui-container mdui-typo"))
+                (a ((class "mdui-btn mdui-btn-icon mdui-ripple") (href "/wiki/"))
+                    (i ((class "mdui-icon material-icons"))
+                        "home"))
+                (p "Page does not exist")
+                (form ([method "POST"] [action ,(string-append "/wiki/" page)])
+                    (input ([class "mdui-btn mdui-btn-raised"] [type "hidden"] [name "content"] [value "Blank page"]))
+                    (input ([class "mdui-btn mdui-btn-raised mdui-color-theme"] [type "submit"] [value "Create page"])))))))]))
 
 
 ; dispatchs

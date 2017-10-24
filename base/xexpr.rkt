@@ -6,6 +6,7 @@
 
 (provide
     response/xexpr/head
+    response/xexpr/edit/head
     response/xexpr/404)
 
 ; head
@@ -14,15 +15,27 @@
   `(head 
     (title ,title)
     (link
-        ((rel "stylesheet") (href "../css/bootstrap.min.css")))
-    (link
-        ((rel "stylesheet") (href "../css/bootstrap-theme.min.css")))
+        ((rel "stylesheet") (href "../css/mdui.min.css")))
     (link
         ((rel "stylesheet") (href "../css/main.css")))
     (script
-        ((src "../js/jquery-3.2.1.min.js")))
+        ((src "../js/mdui.min.js")))
     (script
         ((src "../js/main.js")))
+    ))
+
+(define (response/xexpr/edit/head
+         #:title [title "no title"])
+  `(head 
+    (title ,title)
+    (link
+        ((rel "stylesheet") (href "../../css/mdui.min.css")))
+    (link
+        ((rel "stylesheet") (href "../../css/main.css")))
+    (script
+        ((src "../../js/mdui.min.js")))
+    (script
+        ((src "../../js/main.js")))
     ))
 
 
