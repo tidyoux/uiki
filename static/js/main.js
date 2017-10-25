@@ -1,6 +1,11 @@
 !function () {
     var $$ = mdui.JQ;
     $$(window).on('load', function () {
+        $$("table").prop({
+            border: 1,
+            rules: "all",
+        })
+
         $$("#content").on('keydown', function (e) {
             if (e.keyCode === 9) { // tab was pressed
                 // get caret position/selection
