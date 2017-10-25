@@ -84,71 +84,6 @@
                     (h1 "wiki:")
                     (div ,@items))))))
 
-
-; update wiki
-(define (update-wiki req page)
-    ; modifies the contents of the specified page.
-    
-    ; directory location:
-    (define dir-path (string-append database-dir "/" (wikify-target page)))
-    
-    ; create the directory if it does not exist:
-    (define created? #f)
-    (when (not (directory-exists? dir-path))
-        (set! created? #t)
-        (make-directory dir-path))
-    
-    ; location of the markdown file:
-    (define md-file-path (string-append dir-path "/" "content.md"))
-
-    ; grab the new contents:
-    (define post-data (request-post-data/raw req))
-    
-    (define param-string (bytes->string/utf-8 post-data))
-    
-    (define params (form-urlencoded->alist param-string))
-                    
-    (define contents (cdr (assq 'content params)))
-
-    ; edit the content file:
-    (call-with-output-file
-        md-file-path
-        #:exists 'replace 
-        (λ (out)
-            (write-string contents out)))
-    
-    ; Notify git of changes.
-    (git-commit dir-path)
-
-    ; Render the page.
-    (view-wiki req page
-        #:message (if created? "Page created." "Page edited.")))
-
-    
-; edit wiki
-(define (edit-wiki req page)
-    ; creates a page to allow editing.
-    
-    (define dir-path (string-append database-dir "/" page))
-    (define md-file-path (string-append dir-path "/" "content.md"))
-    
-    (when (file-exists? md-file-path)
-        (response/xexpr
-            #:preamble #"<!DOCTYPE html>"
-            `(html
-                ,(response/xexpr/edit/head
-                    #:title (string-append "edit: " page))
-                (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
-                    (div ((class "mdui-container mdui-typo"))
-                        (form ((method "POST") (action ,(string-append "/wiki/" page)))
-                            (div ((class "mdui-row mdui-m-t-1"))
-                                (div ((class "mdui-col-xs-12"))
-                                    (textarea ((class "mdui-col-xs-12") (id "content") (name "content"))
-                                        ,(file->string md-file-path))))
-                            (br)
-                            (input ((class "mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme") (type "submit") (value "submit")))
-                            (a ((class "mdui-btn mdui-ripple mdui-m-l-3") (href ,(string-append "/wiki/" page)))
-                                "cancel"))))))))
         
 ; view wiki
 (define (view-wiki req page
@@ -193,7 +128,7 @@ MathJax.Hub.Config({
         ; Enable prettify for syntax highlighting:
         (write-bytes #"<script src=\"../js/run_prettify.js\"></script>\n" client-out)
 
-        (write-bytes #"<div class=\"mdui-container mdui-typo\">\n" client-out)
+        (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
 
         ; Include a message, if any:
         (when message
@@ -210,7 +145,18 @@ MathJax.Hub.Config({
 <a class=\"mdui-btn mdui-btn-icon mdui-ripple\" href=\"/wiki/" (wikify-target page) "/edit\">
     <i class=\"mdui-icon material-icons\">edit</i>
 </a>
+<a class=\"mdui-btn mdui-btn-icon mdui-ripple mdui-float-right\" mdui-dialog=\"{target: '#deleteConfirm'}\">
+    <i class=\"mdui-icon material-icons\">delete</i>
+</a>
 </p>
+
+<div class=\"mdui-dialog\" id=\"deleteConfirm\">
+    <div class=\"mdui-dialog-title\">Delete this file?</div>
+    <div class=\"mdui-dialog-actions\">
+        <button class=\"mdui-btn mdui-ripple\" mdui-dialog-close>cancel</button>
+        <a class=\"mdui-btn mdui-ripple\" href=\"/wiki/" (wikify-target page) "/delete\">delete</a>
+    </div>
+</div>
 <hr />")))
         
         ; Render the menu bar:
@@ -259,6 +205,86 @@ MathJax.Hub.Config({
                     (input ([class "mdui-btn mdui-btn-raised mdui-color-theme"] [type "submit"] [value "Create page"])))))))]))
 
 
+; update wiki
+(define (update-wiki req page)
+    ; modifies the contents of the specified page.
+    
+    ; directory location:
+    (define dir-path (string-append database-dir "/" (wikify-target page)))
+    
+    ; create the directory if it does not exist:
+    (define created? #f)
+    (when (not (directory-exists? dir-path))
+        (set! created? #t)
+        (make-directory dir-path))
+    
+    ; location of the markdown file:
+    (define md-file-path (string-append dir-path "/" "content.md"))
+
+    ; grab the new contents:
+    (define post-data (request-post-data/raw req))
+    
+    (define param-string (bytes->string/utf-8 post-data))
+    
+    (define params (form-urlencoded->alist param-string))
+                    
+    (define contents (cdr (assq 'content params)))
+
+    ; edit the content file:
+    (call-with-output-file
+        md-file-path
+        #:exists 'replace 
+        (λ (out)
+            (write-string contents out)))
+    
+    ; Notify git of changes.
+    (git-commit dir-path)
+
+    ; Render the page.
+    (view-wiki req page
+        #:message (if created? "Page created." "Page edited.")))
+
+
+; edit wiki
+(define (edit-wiki req page)
+    ; creates a page to allow editing.
+    
+    (define dir-path (string-append database-dir "/" page))
+    (define md-file-path (string-append dir-path "/" "content.md"))
+    
+    (when (file-exists? md-file-path)
+        (response/xexpr
+            #:preamble #"<!DOCTYPE html>"
+            `(html
+                ,(response/xexpr/edit/head
+                    #:title (string-append "edit: " page))
+                (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
+                    (div ((class "mdui-container mdui-typo mdui-m-t-1"))
+                        (form ((method "POST") (action ,(string-append "/wiki/" page)))
+                            (div ((class "mdui-row"))
+                                (div ((class "mdui-col-xs-12"))
+                                    (textarea ((class "mdui-col-xs-12") (id "content") (name "content"))
+                                        ,(file->string md-file-path))))
+                            (br)
+                            (input ((class "mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme") (type "submit") (value "submit")))
+                            (a ((class "mdui-btn mdui-ripple mdui-m-l-3") (href ,(string-append "/wiki/" page)))
+                                "cancel"))))))))
+
+
+; delete wiki                
+(define (delete-wiki req page)
+    ; delete the wiki page.
+
+    (delete-directory/files (string-append database-dir "/" page)
+        #:must-exist? #f)
+
+    (response/xexpr
+        #:preamble #"<!DOCTYPE html>"
+        `(html
+            (head
+                (meta ((http-equiv "refresh") (content "0.1;url=/wiki/")))))))
+
+
 ; dispatchs
 (define dispatch
     (dispatch-case
@@ -272,7 +298,10 @@ MathJax.Hub.Config({
         [("wiki" (string-arg) "") #:method "post" update-wiki]
 
         [("wiki" (string-arg) "edit") edit-wiki]
-        [("wiki" (string-arg) "edit" "") edit-wiki]))
+        [("wiki" (string-arg) "edit" "") edit-wiki]
+
+        [("wiki" (string-arg) "delete") delete-wiki]
+        [("wiki" (string-arg) "delete" "") delete-wiki]))
 
 
 ; start
