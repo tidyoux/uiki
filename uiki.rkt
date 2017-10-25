@@ -56,14 +56,21 @@
     (define dir (string->path database-dir))
     (define items
         (foldl (lambda (path result)
-            (when (directory-exists? dir)
-                (let ((pathstr (path->string path)))
-                        (append result
-                            `((div ((class "mdui-card mdui-m-b-2 mdui-hoverable"))
-                                (div ((class "mdui-card-content"))
-                                    (a ((class "mdui-btn") (href ,(string-append "/wiki/" pathstr)))
-                                        (i ((class "mdui-icon material-icons mdui-m-r-1")) "description")
-                                        ,pathstr))))))))
+            (when (directory-exists? dir) ; when dir is directory, not a file.
+                (let* ((pathstr (path->string path))
+                        (title (regexp-match #px"#(.*?)\n"
+                                    (read-file (string-append database-dir
+                                                    "/"
+                                                    (wikify-target pathstr)
+                                                    "/content.md")))))
+                    (append result
+                        `((div ((class "mdui-card mdui-m-b-2 mdui-hoverable"))
+                            (div ((class "mdui-card-content"))
+                                (a ((class "mdui-btn") (href ,(string-append "/wiki/" pathstr)))
+                                    (i ((class "mdui-icon material-icons mdui-m-r-1")) "description")
+                                    ,(if title
+                                        (second title)
+                                        pathstr)))))))))
             '()
             (directory-list dir)))
 
