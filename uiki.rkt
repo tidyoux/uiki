@@ -58,18 +58,32 @@
         (foldl (lambda (path result)
                     (when (directory-exists? dir) ; when dir is directory, not a file.
                         (let* ((pathstr (path->string path))
+                                (modify-date (seconds->date (file-or-directory-modify-seconds
+                                                                (build-path dir
+                                                                    path
+                                                                    "content.md"))))
+                                (modify-date-str (string-append (~a (date-year modify-date))
+                                                    "-" (~a (date-month modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
+                                                    "-" (~a (date-day modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
+                                                    " " (~a (date-hour modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
+                                                    ":" (~a (date-minute modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")))
                                 (title (regexp-match #px"#(.*?)\n"
                                             (read-file (string-append database-dir
                                                             "/"
                                                             (wikify-target pathstr)
                                                             "/content.md")))))
+
                             (append `((div ((class "mdui-card mdui-m-b-2 mdui-hoverable"))
                                         (div ((class "mdui-card-content"))
-                                            (a ((class "mdui-btn") (href ,(string-append "/wiki/" pathstr)))
-                                                (i ((class "mdui-icon material-icons mdui-m-r-1")) "description")
+                                            (a ((class "mdui-typo-title mdui-valign") (href ,(string-append "/wiki/" pathstr)))
+                                                (i ((class "mdui-icon material-icons mdui-m-r-1"))
+                                                    "description")
                                                 ,(if title
                                                     (second title)
-                                                    pathstr)))))
+                                                    pathstr))
+                                            (div ((class "mdui-divider mdui-m-t-2")))
+                                            (div ((class "mdui-typo-caption-opacity"))
+                                                ,modify-date-str))))
                                 result))))
             '()
             (directory-list dir)))
