@@ -74,15 +74,10 @@
             '()
             (directory-list dir)))
 
-    (response/xexpr
-        #:preamble #"<!DOCTYPE html>"
-        `(html
-            ,(response/xexpr/head
-                #:title "wiki list")
-            (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange mdui-color-grey-200"))
-                (div ((class "mdui-container mdui-typo"))
-                    (h1 "wiki:")
-                    (div ,@items))))))
+    (response/xexpr/html
+        (response/xexpr/head
+            #:title "wiki list")
+        (response/xexpr/list/body items)))
 
         
 ; view wiki
@@ -110,7 +105,7 @@
         
         ; render the header:
         (define head (response/xexpr/head 
-                      #:title (string-append page " :: " uiki-name)))
+                      #:title uiki-name))
         
         (write-string (xexpr->string head) client-out)
         
@@ -151,7 +146,7 @@ MathJax.Hub.Config({
 </p>
 
 <div class=\"mdui-dialog\" id=\"deleteConfirm\">
-    <div class=\"mdui-dialog-title\">Delete this file?</div>
+    <div class=\"mdui-dialog-title\">Delete file?</div>
     <div class=\"mdui-dialog-actions\">
         <button class=\"mdui-btn mdui-ripple\" mdui-dialog-close>cancel</button>
         <a class=\"mdui-btn mdui-ripple\" href=\"/wiki/" (wikify-target page) "/delete\">delete</a>
@@ -181,28 +176,15 @@ MathJax.Hub.Config({
         
         ; Write the footer:
         (write-bytes #"</div>" client-out)
-
         (write-bytes #"</body>" client-out)
-        
         (write-bytes #"</html>" client-out)))]
     
     ; Or, if the page is not found:
     [else  
-     ; =>
-     (response/xexpr
-      #:preamble #"<!DOCTYPE html>"
-      `(html
-        ,(response/xexpr/head
-          #:title "page does not yet exist")
-        (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
-            (div ((class "mdui-container mdui-typo"))
-                (a ((class "mdui-btn mdui-btn-icon mdui-ripple") (href "/wiki/"))
-                    (i ((class "mdui-icon material-icons"))
-                        "home"))
-                (p "Page does not exist")
-                (form ([method "POST"] [action ,(string-append "/wiki/" page)])
-                    (input ([class "mdui-btn mdui-btn-raised"] [type "hidden"] [name "content"] [value "Blank page"]))
-                    (input ([class "mdui-btn mdui-btn-raised mdui-color-theme"] [type "submit"] [value "Create page"])))))))]))
+        (response/xexpr/html
+            (response/xexpr/head
+                #:title "page not exist")
+            (response/xexpr/view-not-exist/body page))]))
 
 
 ; update wiki
@@ -222,13 +204,10 @@ MathJax.Hub.Config({
     (define md-file-path (string-append dir-path "/" "content.md"))
 
     ; grab the new contents:
-    (define post-data (request-post-data/raw req))
-    
-    (define param-string (bytes->string/utf-8 post-data))
-    
-    (define params (form-urlencoded->alist param-string))
-                    
-    (define contents (cdr (assq 'content params)))
+    (define contents (cdr (assq 'content
+                            (form-urlencoded->alist
+                                (bytes->string/utf-8
+                                    (request-post-data/raw req))))))
 
     ; edit the content file:
     (call-with-output-file
@@ -252,23 +231,14 @@ MathJax.Hub.Config({
     (define dir-path (string-append database-dir "/" page))
     (define md-file-path (string-append dir-path "/" "content.md"))
     
-    (when (file-exists? md-file-path)
-        (response/xexpr
-            #:preamble #"<!DOCTYPE html>"
-            `(html
-                ,(response/xexpr/edit/head
-                    #:title (string-append "edit: " page))
-                (body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
-                    (div ((class "mdui-container mdui-typo mdui-m-t-1"))
-                        (form ((method "POST") (action ,(string-append "/wiki/" page)))
-                            (div ((class "mdui-row"))
-                                (div ((class "mdui-col-xs-12"))
-                                    (textarea ((class "mdui-col-xs-12") (id "content") (name "content"))
-                                        ,(file->string md-file-path))))
-                            (br)
-                            (input ((class "mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme") (type "submit") (value "submit")))
-                            (a ((class "mdui-btn mdui-ripple mdui-m-l-3") (href ,(string-append "/wiki/" page)))
-                                "cancel"))))))))
+    (if (file-exists? md-file-path)
+        (response/xexpr/html
+            (response/xexpr/edit/head
+                #:title (string-append "edit:" page))
+            (response/xexpr/edit/body
+                md-file-path
+                page))
+        (response/xexpr/jump2list)))
 
 
 ; delete wiki                
@@ -278,11 +248,7 @@ MathJax.Hub.Config({
     (delete-directory/files (string-append database-dir "/" page)
         #:must-exist? #f)
 
-    (response/xexpr
-        #:preamble #"<!DOCTYPE html>"
-        `(html
-            (head
-                (meta ((http-equiv "refresh") (content "0.1;url=/wiki/")))))))
+    (response/xexpr/jump2list))
 
 
 ; dispatchs
