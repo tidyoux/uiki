@@ -5,7 +5,6 @@ run: db passwd
 
 db:
 	mkdir db
-	mkdir db/main
 
 passwd:
 	echo 'Enter a password for the user `admin`':

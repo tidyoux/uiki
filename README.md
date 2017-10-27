@@ -13,9 +13,9 @@ To enable remote checkouts/editing and to avoid the
 risk of losing data due to upgrades, all uiki pages are stored 
 in (markdown-formatted) plaintext.
 
-For a page `<name>`, the content for that page will be (by default) in:
+For a user `<user>` and a page `<name>`, the content for that page will be (by default) in:
 
-    db/<name>/content.md
+    db/<user>/<name>/content.md
 
 which is also easily editable by a text editor on the server.
 
@@ -47,11 +47,9 @@ or directly with:
 
     racket uiki.rkt
 
-By default, it will be on port 8080, and the main page is `/wiki/main`.
-
 After you start it, set your browser to:
 
-    http://localhost:8080/wiki/main
+    http://localhost:1234/wiki/
 
 
 

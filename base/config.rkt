@@ -13,10 +13,13 @@
 ; the root directory:
 (define root (path->string (current-directory)))
 
-
 ; the database directory:
-(define database-dir (string-append root "/db"))
+(define (database-dir user)
+    (string-append root "/db/" user))
 
+; the page directory:
+(define (database-page-dir user page)
+    (string-append root "/db/" user "/" page))
 
 ; the command for processing markdown into html:
 (define markdown-command "multimarkdown")

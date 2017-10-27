@@ -46,6 +46,7 @@
     "base/xexpr.rkt"
     "base/wikify.rkt"
     "base/git.rkt"
+    "base/utils.rkt"
     "base/auth.rkt")
 
 ; Import configuration variables:
@@ -53,152 +54,117 @@
 
 ; list wiki
 (define (list-wiki req)
-    (define dir (string->path database-dir))
+    (define user (auth-user req))
+    (define dir (string->path (database-dir user)))
     (define items
-        (foldl (lambda (path result)
-                    (when (directory-exists? dir) ; when dir is directory, not a file.
+        (if (directory-exists? dir)
+            (foldl
+                (lambda (path result)
+                    (when (directory-exists? (build-path dir path)) ; when path is directory, not a file.
                         (let* ((pathstr (path->string path))
                                 (modify-date (seconds->date (file-or-directory-modify-seconds
                                                                 (build-path dir
                                                                     path
                                                                     "content.md"))))
-                                (modify-date-str (string-append (~a (date-year modify-date))
-                                                    "-" (~a (date-month modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
-                                                    "-" (~a (date-day modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
-                                                    " " (~a (date-hour modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")
-                                                    ":" (~a (date-minute modify-date) #:min-width 2 #:align 'right #:left-pad-string "0")))
                                 (title (regexp-match #px"#(.*?)\n"
-                                            (read-file (string-append database-dir
-                                                            "/"
-                                                            (wikify-target pathstr)
+                                            (read-file (string-append
+                                                            (database-page-dir user pathstr)
                                                             "/content.md")))))
 
-                            (append `((div ((class "mdui-card mdui-m-b-2 mdui-hoverable"))
-                                        (div ((class "mdui-card-content"))
-                                            (a ((class "mdui-typo-title mdui-valign") (href ,(string-append "/wiki/" pathstr)))
-                                                (i ((class "mdui-icon material-icons mdui-m-r-1"))
-                                                    "description")
-                                                ,(if title
-                                                    (second title)
-                                                    pathstr))
-                                            (div ((class "mdui-divider mdui-m-t-2")))
-                                            (div ((class "mdui-typo-caption-opacity"))
-                                                ,modify-date-str))))
+                            (append (response/xexpr/list/item
+                                        pathstr
+                                        (format-date modify-date "year-month-day hour:minute")
+                                        title)
                                 result))))
-            '()
-            (directory-list dir)))
+                '()
+                (directory-list dir))
+            '()))
 
     (response/xexpr/html
         (response/xexpr/head
             #:title "wiki list")
-        (response/xexpr/list/body items)))
+        (response/xexpr/list/body user items)))
 
         
 ; view wiki
 (define (view-wiki req page
                 #:message [message #f])
   
-  ; directory containing page contents:
-  (define dir-path (string-append database-dir "/" page))
-  
-  ; markdown file containing the page:
-  (define md-file-path (string-append dir-path "/" "content.md"))
-
-  (cond
+    ; directory containing page contents:
+    (define user (auth-user req))
+    (define dir-path (database-page-dir user page))
     
-    [(file-exists? md-file-path)
-     (response
-      200 #"OK"            ; code & message
-      (current-seconds)    ; timestamp
-      TEXT/HTML-MIME-TYPE  ; content type
-      '()                  ; additional headers
-      (λ (client-out)
-                
-        ; render the top:
-        (write-bytes #"<!DOCTYPE>\n<html>\n" client-out)
-        
-        ; render the header:
-        (define head (response/xexpr/head 
-                      #:title uiki-name))
-        
-        (write-string (xexpr->string head) client-out)
-        
-        ; render the body:
-        (write-bytes #"<body class=\"mdui-theme-primary-indigo mdui-theme-accent-deep-orange\">" client-out)
-        
-        ; enable MathJax for LaTeX support:
-        (write-bytes #"<script type=\"text/x-mathjax-config\">
-MathJax.Hub.Config({
-  tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
-});
-</script>" client-out)
-        (write-bytes #"<script src=\"https://cdn.bootcss.com/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML\"></script>" client-out)
-        
-        ; Enable prettify for syntax highlighting:
-        (write-bytes #"<script src=\"../js/run_prettify.js\"></script>\n" client-out)
+    ; markdown file containing the page:
+    (define md-file-path (string-append dir-path "/" "content.md"))
 
-        (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
+    (cond
+        [(file-exists? md-file-path)
+            (response
+                200 #"OK"            ; code & message
+                (current-seconds)    ; timestamp
+                TEXT/HTML-MIME-TYPE  ; content type
+                '()                  ; additional headers
+                (λ (client-out)
+                            
+                    ; render the top:
+                    (write-bytes #"<!DOCTYPE>\n<html>\n" client-out)
+                    
+                    ; render the header:
+                    (define head (response/xexpr/view/head 
+                                    #:title uiki-name))
+                    
+                    (write-string (xexpr->string head) client-out)
+                    
+                    ; render the body:
+                    (write-bytes #"<body class=\"mdui-theme-primary-indigo mdui-theme-accent-deep-orange\">" client-out)
+                    
+                    ; enable MathJax for LaTeX support:
+                    (write-bytes #"<script type=\"text/x-mathjax-config\">
+            MathJax.Hub.Config({
+            tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
+            });
+            </script>" client-out)
 
-        ; Include a message, if any:
-        (when message
-          (write-string message client-out)
-          (write-string "<hr />" client-out))
-        
-        ; Render the menu bar:
-        (define wiki-top-bar 
-          (string->bytes/utf-8 (string-append "
-<p>
-<a class=\"mdui-btn mdui-btn-icon mdui-ripple\" href=\"/wiki/\">
-    <i class=\"mdui-icon material-icons\">home</i>
-</a>
-<a class=\"mdui-btn mdui-btn-icon mdui-ripple\" href=\"/wiki/" (wikify-target page) "/edit\">
-    <i class=\"mdui-icon material-icons\">edit</i>
-</a>
-<a class=\"mdui-btn mdui-btn-icon mdui-ripple mdui-float-right\" mdui-dialog=\"{target: '#deleteConfirm'}\">
-    <i class=\"mdui-icon material-icons\">delete</i>
-</a>
-</p>
+                    (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
 
-<div class=\"mdui-dialog\" id=\"deleteConfirm\">
-    <div class=\"mdui-dialog-title\">Delete file?</div>
-    <div class=\"mdui-dialog-actions\">
-        <button class=\"mdui-btn mdui-ripple\" mdui-dialog-close>cancel</button>
-        <a class=\"mdui-btn mdui-ripple\" href=\"/wiki/" (wikify-target page) "/delete\">delete</a>
-    </div>
-</div>
-<hr />")))
-        
-        ; Render the menu bar:
-        (write-bytes wiki-top-bar client-out)
-        
-        ; Pass content.md through through a markdown formatter, and then
-        ; through the wikifier to convert wiki syntax:
-        (let ((temp-file-path (string-append md-file-path ".temp")))
+                    ; Include a message, if any:
+                    (when message
+                        (write-string message client-out)
+                        (write-string "<hr />" client-out))
+                    
+                    ; Render the menu bar:
+                    (define wiki-menu-bar (xexpr->string (response/xexpr/view-menu-bar page))) 
 
-            (write-file temp-file-path
-                (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
+                    (write-string wiki-menu-bar client-out)
+                    
+                    ; Pass content.md through through a markdown formatter, and then
+                    ; through the wikifier to convert wiki syntax:
+                    (let ((temp-file-path (string-append md-file-path ".temp")))
 
-            (define input-port
-                (open-input-string ($ markdown-command temp-file-path)))
+                        (write-file temp-file-path
+                            (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
 
-            ; Convert contents to wiki:
-            (define wikified (apply string-append (wikify-text input-port)))
-            (write-string wikified client-out)
+                        (define input-port
+                            (open-input-string ($ markdown-command temp-file-path)))
 
-            (close-input-port input-port)
-            (delete-file temp-file-path))
-        
-        ; Write the footer:
-        (write-bytes #"</div>" client-out)
-        (write-bytes #"</body>" client-out)
-        (write-bytes #"</html>" client-out)))]
+                        ; Convert contents to wiki:
+                        (define wikified (apply string-append (wikify-text input-port)))
+                        (write-string wikified client-out)
+
+                        (close-input-port input-port)
+                        (delete-file temp-file-path))
+                    
+                    ; Write the footer:
+                    (write-bytes #"</div>" client-out)
+                    (write-bytes #"</body>" client-out)
+                    (write-bytes #"</html>" client-out)))]
     
-    ; Or, if the page is not found:
-    [else  
-        (response/xexpr/html
-            (response/xexpr/head
-                #:title "page not exist")
-            (response/xexpr/view-not-exist/body page))]))
+        ; Or, if the page is not found:
+        [else  
+            (response/xexpr/html
+                (response/xexpr/head
+                    #:title "page not exist")
+                (response/xexpr/view-not-exist/body page))]))
 
 
 ; update wiki
@@ -206,13 +172,14 @@ MathJax.Hub.Config({
     ; modifies the contents of the specified page.
     
     ; directory location:
-    (define dir-path (string-append database-dir "/" (wikify-target page)))
+    (define user (auth-user req))
+    (define dir-path (database-page-dir user page))
     
     ; create the directory if it does not exist:
     (define created? #f)
     (when (not (directory-exists? dir-path))
         (set! created? #t)
-        (make-directory dir-path))
+        (make-directory* dir-path))
     
     ; location of the markdown file:
     (define md-file-path (string-append dir-path "/" "content.md"))
@@ -242,7 +209,8 @@ MathJax.Hub.Config({
 (define (edit-wiki req page)
     ; creates a page to allow editing.
     
-    (define dir-path (string-append database-dir "/" page))
+    (define user (auth-user req))
+    (define dir-path (database-page-dir user page))
     (define md-file-path (string-append dir-path "/" "content.md"))
     
     (if (file-exists? md-file-path)
@@ -259,7 +227,8 @@ MathJax.Hub.Config({
 (define (delete-wiki req page)
     ; delete the wiki page.
 
-    (delete-directory/files (string-append database-dir "/" page)
+    (define user (auth-user req))
+    (delete-directory/files (database-page-dir user page)
         #:must-exist? #f)
 
     (response/xexpr/jump2list))
@@ -286,15 +255,14 @@ MathJax.Hub.Config({
 
 ; start
 (define (start req)
-    (if (and auth-db-path (not (authenticated? auth-db-path req)))
+    (if (and auth-db-path
+            (not (authenticated? auth-db-path req)))
         (response
             401 #"Unauthorized" 
             (current-seconds) 
             TEXT/HTML-MIME-TYPE
-            (list
-                (make-basic-auth-header
-                    "Authentication required"
-                    ))
+            (list (make-basic-auth-header
+                    "Authentication required"))
             void)
 
         (dispatch req)))
