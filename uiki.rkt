@@ -269,6 +269,7 @@
   
 (define (run)
     (serve/servlet start
+        #:listen-ip uiki-listen-ip
         #:port uiki-port
         #:launch-browser? #f
         #:servlet-path "/wiki/main"

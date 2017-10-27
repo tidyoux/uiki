@@ -4,6 +4,9 @@
 ; the name of the giki:
 (define uiki-name "generic uiki")
 
+; TCP listen ip
+(define uiki-listen-ip "localhost")
+
 ; TCP port number:
 (define uiki-port 1234) ; set this to 1234 for testing
                         ; set this to 80 if unencrypted
