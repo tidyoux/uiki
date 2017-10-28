@@ -98,11 +98,11 @@
         (div ((class "mdui-container mdui-typo"))
             (h1 ,(string-append user "'s wiki:"))
 
+            (div ,@items)
+
             (form ((method "POST") (action ,(string-append "/wiki/" (~a (current-milliseconds)))))
                 (input ((type "hidden") (name "content") (value "# This is the title\n\n")))
-                (input ((class "mdui-fab mdui-fab-fixed mdui-color-theme") (type "submit") (value "+"))))
-
-            (div ,@items))))
+                (input ((class "mdui-fab mdui-fab-fixed mdui-color-theme") (type "submit") (value "+"))))))) 
 
 ; view page not exist
 (define (response/xexpr/view-not-exist/body page)
