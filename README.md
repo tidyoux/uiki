@@ -125,6 +125,20 @@ a fenced block by specifying the language, as in:
     }
     ```
 
+## Screenshot
+
+list page:
+
+![img1](./screenshot/uiki-1.png)
+
+view page:
+
+![img1](./screenshot/uiki-2.png)
+
+edit page:
+
+![img1](./screenshot/uiki-3.png)
+
 ## License
 
 Uiki: A simple academic wiki.
