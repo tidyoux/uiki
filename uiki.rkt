@@ -86,85 +86,91 @@
         (response/xexpr/list/body user items)))
 
         
+; make wiki view
+(define (make-wiki-view md-file-path client-out head
+            #:message [message #f]
+            #:menu-bar [menu-bar #f])
+            
+    ; render the top:
+    (write-bytes #"<!DOCTYPE>\n<html>\n" client-out)
+    
+    ; render the header:
+    (write-string (xexpr->string head) client-out)
+    
+    ; render the body:
+    (write-bytes #"<body class=\"mdui-theme-primary-indigo mdui-theme-accent-deep-orange\">" client-out)
+    
+    ; enable MathJax for LaTeX support:
+    (write-bytes #"<script type=\"text/x-mathjax-config\">
+MathJax.Hub.Config({
+tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
+});
+</script>" client-out)
+
+    (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
+
+    ; Include a message, if any:
+    (when message
+        (write-string message client-out)
+        (write-string "<hr />" client-out))
+    
+    ; Render the menu bar:
+    (when menu-bar
+        (write-string (xexpr->string menu-bar) client-out))
+    
+    ; Pass content.md through through a markdown formatter, and then
+    ; through the wikifier to convert wiki syntax:
+    (let ((temp-file-path (string-append md-file-path ".temp")))
+
+        (write-file temp-file-path
+            (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
+
+        (define input-port
+            (open-input-string ($ markdown-command temp-file-path)))
+
+        ; Convert contents to wiki:
+        (define wikified (apply string-append (wikify-text input-port)))
+        (write-string wikified client-out)
+
+        (close-input-port input-port)
+        (delete-file temp-file-path))
+    
+    ; Write the footer:
+    (write-bytes #"</div></body></html>" client-out))
+
+
 ; view wiki
 (define (view-wiki req page
                 #:message [message #f])
   
-    ; directory containing page contents:
     (define user (auth-user req))
-    (define dir-path (database-page-dir user page))
-    
+
     ; markdown file containing the page:
-    (define md-file-path (string-append dir-path "/" "content.md"))
+    (define md-file-path (string-append
+                            (database-page-dir user page)
+                            "/"
+                            "content.md"))
 
-    (cond
-        [(file-exists? md-file-path)
-            (response
-                200 #"OK"            ; code & message
-                (current-seconds)    ; timestamp
-                TEXT/HTML-MIME-TYPE  ; content type
-                '()                  ; additional headers
-                (λ (client-out)
-                            
-                    ; render the top:
-                    (write-bytes #"<!DOCTYPE>\n<html>\n" client-out)
-                    
-                    ; render the header:
-                    (define head (response/xexpr/view/head 
-                                    #:title uiki-name))
-                    
-                    (write-string (xexpr->string head) client-out)
-                    
-                    ; render the body:
-                    (write-bytes #"<body class=\"mdui-theme-primary-indigo mdui-theme-accent-deep-orange\">" client-out)
-                    
-                    ; enable MathJax for LaTeX support:
-                    (write-bytes #"<script type=\"text/x-mathjax-config\">
-            MathJax.Hub.Config({
-            tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
-            });
-            </script>" client-out)
+    (if (file-exists? md-file-path)
 
-                    (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
-
-                    ; Include a message, if any:
-                    (when message
-                        (write-string message client-out)
-                        (write-string "<hr />" client-out))
-                    
-                    ; Render the menu bar:
-                    (define wiki-menu-bar (xexpr->string (response/xexpr/view-menu-bar page))) 
-
-                    (write-string wiki-menu-bar client-out)
-                    
-                    ; Pass content.md through through a markdown formatter, and then
-                    ; through the wikifier to convert wiki syntax:
-                    (let ((temp-file-path (string-append md-file-path ".temp")))
-
-                        (write-file temp-file-path
-                            (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
-
-                        (define input-port
-                            (open-input-string ($ markdown-command temp-file-path)))
-
-                        ; Convert contents to wiki:
-                        (define wikified (apply string-append (wikify-text input-port)))
-                        (write-string wikified client-out)
-
-                        (close-input-port input-port)
-                        (delete-file temp-file-path))
-                    
-                    ; Write the footer:
-                    (write-bytes #"</div>" client-out)
-                    (write-bytes #"</body>" client-out)
-                    (write-bytes #"</html>" client-out)))]
+        (response
+            200 #"OK"            ; code & message
+            (current-seconds)    ; timestamp
+            TEXT/HTML-MIME-TYPE  ; content type
+            '()                  ; additional headers
+            (λ (client-out)
+                (make-wiki-view md-file-path
+                    client-out
+                    (response/xexpr/view/head 
+                        #:title uiki-name)
+                    #:message message
+                    #:menu-bar (response/xexpr/view/menu-bar user page))))
     
         ; Or, if the page is not found:
-        [else  
-            (response/xexpr/html
-                (response/xexpr/head
-                    #:title "page not exist")
-                (response/xexpr/view-not-exist/body page))]))
+        (response/xexpr/html
+            (response/xexpr/head
+                #:title "page not exist")
+            (response/xexpr/view/not-exist/body page))))
 
 
 ; update wiki
@@ -234,41 +240,56 @@
     (response/xexpr/jump2list))
 
 
+; view public wiki
+(define (view-pub-wiki req user page)
+    
+    ; markdown file containing the page:
+    (define md-file-path (string-append
+                            (database-page-dir user page)
+                            "/"
+                            "content.md"))
+
+    (if (file-exists? md-file-path)
+
+        (response
+            200 #"OK"            ; code & message
+            (current-seconds)    ; timestamp
+            TEXT/HTML-MIME-TYPE  ; content type
+            '()                  ; additional headers
+            (λ (client-out)
+                (make-wiki-view md-file-path
+                    client-out
+                    (response/xexpr/view/pub/head
+                        #:title uiki-name))))
+    
+        ; Or, if the page is not found:
+        (response/xexpr/404 req)))
+
+
 ; dispatchs
 (define dispatch
     (dispatch-case
-        [("wiki") list-wiki]
-        [("wiki" "") list-wiki]
+        [("wiki") (with-auth list-wiki)]
+        [("wiki" "") (with-auth list-wiki)]
 
-        [("wiki" (string-arg)) #:method "get" view-wiki]
-        [("wiki" (string-arg) "") #:method "get" view-wiki]
+        [("wiki" (string-arg)) #:method "get" (with-auth view-wiki)]
+        [("wiki" (string-arg) "") #:method "get" (with-auth view-wiki)]
 
-        [("wiki" (string-arg)) #:method "post" update-wiki]
-        [("wiki" (string-arg) "") #:method "post" update-wiki]
+        [("wiki" (string-arg)) #:method "post" (with-auth update-wiki)]
+        [("wiki" (string-arg) "") #:method "post" (with-auth update-wiki)]
 
-        [("wiki" (string-arg) "edit") edit-wiki]
-        [("wiki" (string-arg) "edit" "") edit-wiki]
+        [("wiki" (string-arg) "edit") (with-auth edit-wiki)]
+        [("wiki" (string-arg) "edit" "") (with-auth edit-wiki)]
 
-        [("wiki" (string-arg) "delete") delete-wiki]
-        [("wiki" (string-arg) "delete" "") delete-wiki]))
+        [("wiki" (string-arg) "delete") (with-auth delete-wiki)]
+        [("wiki" (string-arg) "delete" "") (with-auth delete-wiki)]
+
+        [("wiki" (string-arg) (string-arg)) view-pub-wiki]
+        [("wiki" (string-arg) (string-arg) "") view-pub-wiki]))
 
 
-; start
-(define (start req)
-    (if (and auth-db-path
-            (not (authenticated? auth-db-path req)))
-        (response
-            401 #"Unauthorized" 
-            (current-seconds) 
-            TEXT/HTML-MIME-TYPE
-            (list (make-basic-auth-header
-                    "Authentication required"))
-            void)
-
-        (dispatch req)))
-  
 (define (run)
-    (serve/servlet start
+    (serve/servlet dispatch 
         #:listen-ip uiki-listen-ip
         #:port uiki-port
         #:launch-browser? #f

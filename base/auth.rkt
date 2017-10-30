@@ -3,11 +3,13 @@
 (require
     file/sha1
     net/base64
-    web-server/http/basic-auth)
+    web-server/servlet)
+
+(include "config.rkt")
 
 (provide
     auth-user
-    authenticated?)
+    with-auth)
 
 ; HTTP Basic Authentication:
 (define (htpasswd-credentials-valid?
@@ -46,12 +48,14 @@
     ; check to see if any line validates:
     (ormap password-matches? lines))
 
+; auth user
 (define (auth-user req)
     (let ((auth-info (request->basic-credentials req)))
         (if auth-info
             (bytes->string/utf-8 (car auth-info))
             "")))
 
+; authenticated?
 (define (authenticated? passwd-file req)
     ; checks if a request has valid credentials:
     (match (request->basic-credentials req)
@@ -59,3 +63,18 @@
             (htpasswd-credentials-valid? passwd-file user pass)]
         
         [else #f]))
+
+; with-auth
+(define (with-auth handler)
+    (lambda (req . args)
+        (if (and auth-db-path
+                (not (authenticated? auth-db-path req)))
+            (response
+                401 #"Unauthorized" 
+                (current-seconds) 
+                TEXT/HTML-MIME-TYPE
+                (list (make-basic-auth-header
+                        "Authentication required"))
+                void)
+
+            (apply handler req args))))

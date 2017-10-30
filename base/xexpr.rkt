@@ -9,12 +9,13 @@
 
     response/xexpr/head
     response/xexpr/view/head
+    response/xexpr/view/pub/head
     response/xexpr/edit/head
 
     response/xexpr/list/item
     response/xexpr/list/body
-    response/xexpr/view-not-exist/body
-    response/xexpr/view-menu-bar
+    response/xexpr/view/not-exist/body
+    response/xexpr/view/menu-bar
     response/xexpr/edit/body
 
     response/xexpr/jump2list
@@ -63,6 +64,25 @@
             ((src "../js/main.js")))
         ))
 
+; view pub head
+(define (response/xexpr/view/pub/head
+         #:title [title "no title"])
+    `(head 
+        (title ,title)
+        (link
+            ((rel "stylesheet") (href "../../css/mdui.min.css")))
+        (link
+            ((rel "stylesheet") (href "../../css/main.css")))
+        (script
+            ((src "https://cdn.bootcss.com/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML")))
+        (script
+            ((src "../../js/mdui.min.js")))
+        (script
+            ((src "../../js/run_prettify.js")))
+        (script
+            ((src "../../js/main.js")))
+        ))
+
 ; edit head
 (define (response/xexpr/edit/head
          #:title [title "no title"])
@@ -105,7 +125,7 @@
                 (input ((class "mdui-fab mdui-fab-fixed mdui-color-theme") (type "submit") (value "+"))))))) 
 
 ; view page not exist
-(define (response/xexpr/view-not-exist/body page)
+(define (response/xexpr/view/not-exist/body page)
     `(body ((class "mdui-theme-primary-indigo mdui-theme-accent-deep-orange"))
         (div ((class "mdui-container mdui-typo mdui-m-t-1"))
             (a ((class "mdui-btn mdui-btn-icon mdui-ripple") (href "/wiki/"))
@@ -118,15 +138,18 @@
                 (input ([class "mdui-btn mdui-btn-raised mdui-color-theme"] [type "submit"] [value "Create page"]))))))
 
 ; view menu bar
-(define (response/xexpr/view-menu-bar page)
+(define (response/xexpr/view/menu-bar user page)
     `(div
         (p
             (a ((class "mdui-btn mdui-btn-icon mdui-ripple") (href "/wiki/"))
                 (i ((class "mdui-icon material-icons"))
                     "home"))
-            (a ((class "mdui-btn mdui-btn-icon mdui-ripple") (href ,(string-append "/wiki/" page "/edit")))
+            (a ((class "mdui-btn mdui-btn-icon mdui-ripple mdui-m-l-1") (href ,(string-append "/wiki/" page "/edit")))
                 (i ((class "mdui-icon material-icons"))
                     "edit"))
+            (a ((class "mdui-btn mdui-btn-icon mdui-ripple mdui-m-l-1") (href ,(string-append "/wiki/" user "/" page)))
+                (i ((class "mdui-icon material-icons"))
+                    "share"))
             (a ((class "mdui-btn mdui-btn-icon mdui-ripple mdui-float-right") (mdui-dialog "{target: '#deleteConfirm'}"))
                 (i ((class "mdui-icon material-icons"))
                     "delete")))
