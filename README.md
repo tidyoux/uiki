@@ -86,15 +86,6 @@ Then, modify the approriate entries in `global.rkt` to point
 to these, and set `use-ssl?` to `#t`.
 
 
-
-## Wiki syntax
-
-You can link to new pages by enclosing their name in `[[` and `]]`.
-
-You can use the pipe `[[target|text]]` notation to redirect a 
-within-wiki link.
-
-
 ## Markdown syntax
 
 Markdown syntax is supported by [multimarkdown].

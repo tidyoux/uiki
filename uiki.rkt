@@ -44,7 +44,6 @@
 (require
     "base/cmd.rkt"
     "base/xexpr.rkt"
-    "base/wikify.rkt"
     "base/git.rkt"
     "base/utils.rkt"
     "base/auth.rkt")
@@ -127,14 +126,8 @@ tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
         (write-file temp-file-path
             (regexp-replace* "\n```([a-z]+)" (read-file md-file-path) "\n```prettyprint lang-\\1"))
 
-        (define input-port
-            (open-input-string ($ markdown-command temp-file-path)))
+        (write-string ($ markdown-command temp-file-path) client-out)
 
-        ; Convert contents to wiki:
-        (define wikified (apply string-append (wikify-text input-port)))
-        (write-string wikified client-out)
-
-        (close-input-port input-port)
         (delete-file temp-file-path))
     
     ; Write the footer:
