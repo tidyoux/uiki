@@ -60,12 +60,13 @@
         (if (directory-exists? dir)
             (foldl
                 (lambda (path result)
-                    (when (directory-exists? (build-path dir path)) ; when path is directory, not a file.
+                    (define md-file-path (build-path dir path "content.md"))
+                    (if (file-exists? md-file-path) ; when path is directory, not a file.
                         (let* ((pathstr (path->string path))
                                 (modify-date (seconds->date (file-or-directory-modify-seconds
-                                                                (build-path dir
-                                                                    path
-                                                                    "content.md"))))
+                                                                md-file-path
+                                                                #f
+                                                                (lambda () 0))))
                                 (title (regexp-match #px"#(.*?)\n"
                                             (read-file (string-append
                                                             (database-page-dir user pathstr)
@@ -75,7 +76,8 @@
                                         pathstr
                                         (format-date modify-date "year-month-day hour:minute")
                                         title)
-                                result))))
+                                result))
+                        result))
                 '()
                 (directory-list dir))
             '()))
