@@ -108,7 +108,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\\\(','\\\\)']]}
 });
 </script>" client-out)
 
-    (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1\">\n" client-out)
+    (write-bytes #"<div class=\"mdui-container mdui-typo mdui-m-t-1 mdui-m-b-5\">\n" client-out)
 
     ; Include a message, if any:
     (when message
