@@ -1,6 +1,6 @@
 
-p {
-    font-size: 1.2em;
+p, li {
+    font-size: large;
 }
 
 th, td {
@@ -10,6 +10,6 @@ th, td {
 textarea#content {
     height: 700px;
     resize: none;
-    font-size: inherit;
+    font-size: large;
     font-family: inherit;
 }
