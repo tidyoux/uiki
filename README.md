@@ -41,11 +41,8 @@ There is no installation.  Uiki runs in place.
 
 To run uiki, use:
 
+    cd build
     make run
-
-or directly with:
-
-    racket uiki.rkt
 
 After you start it, set your browser to:
 
