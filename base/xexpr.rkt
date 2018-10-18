@@ -55,7 +55,7 @@
         (link
             ((rel "stylesheet") (href "../css/main.css")))
         (script
-            ((src "https://cdn.bootcss.com/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML")))
+            ((src "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js")))
         (script
             ((src "../js/mdui.min.js")))
         (script
