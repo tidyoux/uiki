@@ -1,7 +1,8 @@
 #lang racket
 
 (provide
-    format-date)
+    format-date
+    modify-seconds)
 
 
 (define (format-date date format)
@@ -23,3 +24,9 @@
                 (~a (date-minute date) #:min-width 2 #:align 'right #:left-pad-string "0"))
         "second"
             (~a (date-second date) #:min-width 2 #:align 'right #:left-pad-string "0")))
+
+(define (modify-seconds path)
+    (file-or-directory-modify-seconds
+        path
+        #f
+        (lambda () 0)))

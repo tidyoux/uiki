@@ -62,10 +62,8 @@
                     (define md-file-path (build-path dir path "content.md"))
                     (if (file-exists? md-file-path) ; when path is directory, not a file.
                         (let* ((pathstr (path->string path))
-                                (modify-date (seconds->date (file-or-directory-modify-seconds
-                                                                md-file-path
-                                                                #f
-                                                                (lambda () 0))))
+                                (modify-date (seconds->date (modify-seconds
+                                                                md-file-path)))
                                 (title (regexp-match #px"#(.*?)\n"
                                             (read-file (string-append
                                                             (database-page-dir user pathstr)
@@ -78,7 +76,11 @@
                                 result))
                         result))
                 '()
-                (directory-list dir))
+                (sort (directory-list dir)
+                    (lambda (x y)
+                        (let ((fx (build-path dir x "content.md"))
+                            (fy (build-path dir y "content.md")))
+                            (< (modify-seconds fx) (modify-seconds fy))))))
             '()))
 
     (response/xexpr/html
